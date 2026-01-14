@@ -85,16 +85,16 @@ builder.Services.AddCors(options =>
 });
 
 // Configure Database from environment variables
-var host = Environment.GetEnvironmentVariable("MYSQL_HOST") ?? "localhost";
-var port = Environment.GetEnvironmentVariable("MYSQL_PORT") ?? "3306";
-var database = Environment.GetEnvironmentVariable("MYSQL_DATABASE") ?? "TodoTaskDB";
-var user = Environment.GetEnvironmentVariable("MYSQL_USER") ?? "root";
-var password = Environment.GetEnvironmentVariable("MYSQL_PASSWORD") ?? "";
+var host = Environment.GetEnvironmentVariable("MYSQL_HOST");
+var port = Environment.GetEnvironmentVariable("MYSQL_PORT");
+var database = Environment.GetEnvironmentVariable("MYSQL_DATABASE");
+var user = Environment.GetEnvironmentVariable("MYSQL_USER");
+var password = Environment.GetEnvironmentVariable("MYSQL_PASSWORD");
 
 var connectionString = $"Server={host};Port={port};Database={database};User={user};Password={password};";
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-	options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+	options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 36))));
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
