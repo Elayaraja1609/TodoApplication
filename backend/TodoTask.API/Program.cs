@@ -10,35 +10,38 @@ using TodoTask.Infrastructure.Data;
 using TodoTask.Infrastructure.Repositories;
 using TodoTask.Infrastructure.Services;
 using TodoTask.API.Middleware;
+using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Serilog
+#region Logging (Serilog)
+
 Log.Logger = new LoggerConfiguration()
 	.ReadFrom.Configuration(builder.Configuration)
 	.Enrich.FromLogContext()
+	.WriteTo.Console()
 	.CreateLogger();
 
 builder.Host.UseSerilog();
 
-// Add services to the container
+#endregion
+
+#region Controllers & Swagger
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// Configure Swagger/OpenAPI
 builder.Services.AddSwaggerGen(c =>
 {
 	c.SwaggerDoc("v1", new OpenApiInfo
 	{
 		Title = "Todo Task API",
-		Version = "v1",
-		Description = "A production-ready Todo & Reminder API"
+		Version = "v1"
 	});
 
-	// Add JWT authentication to Swagger
 	c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
 	{
-		Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token",
+		Description = "JWT Authorization header using the Bearer scheme",
 		Name = "Authorization",
 		In = ParameterLocation.Header,
 		Type = SecuritySchemeType.ApiKey,
@@ -61,67 +64,84 @@ builder.Services.AddSwaggerGen(c =>
 	});
 });
 
-// Configure CORS
+#endregion
+
+#region CORS
+
 builder.Services.AddCors(options =>
 {
 	options.AddPolicy("AllowAll", policy =>
 	{
-		if (builder.Environment.IsDevelopment())
-		{
-			// In development, allow all origins for easier testing
-			policy.AllowAnyOrigin()
-				  .AllowAnyMethod()
-				  .AllowAnyHeader();
-		}
-		else
-		{
-			// In production, restrict to specific origins
-			policy.AllowAnyOrigin()
-				  .AllowAnyMethod()
-				  .AllowAnyHeader()
-				  .AllowCredentials();
-		}
+		policy.AllowAnyOrigin()
+			  .AllowAnyMethod()
+			  .AllowAnyHeader();
 	});
 });
 
-// Configure Database from environment variables
-var host = Environment.GetEnvironmentVariable("MYSQL_HOST");
-var port = Environment.GetEnvironmentVariable("MYSQL_PORT");
-var database = Environment.GetEnvironmentVariable("MYSQL_DATABASE");
-var user = Environment.GetEnvironmentVariable("MYSQL_USER");
-var password = Environment.GetEnvironmentVariable("MYSQL_PASSWORD");
+#endregion
 
-var connectionString = $"Server={host};Port={port};Database={database};User={user};Password={password};";
+#region Database (Railway Safe)
+
+var host = Environment.GetEnvironmentVariable("MYSQLHOST");
+var port = Environment.GetEnvironmentVariable("MYSQLPORT");
+var database = Environment.GetEnvironmentVariable("MYSQLDATABASE");
+var user = Environment.GetEnvironmentVariable("MYSQLUSER");
+var password = Environment.GetEnvironmentVariable("MYSQLPASSWORD");
+
+// Fail fast if Railway variables are missing
+if (string.IsNullOrWhiteSpace(host))
+{
+	throw new InvalidOperationException("MYSQLHOST environment variable is not set.");
+}
+
+var connectionString =
+	$"Server={host};Port={port};Database={database};User={user};Password={password};";
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-	options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 36))));
+	options.UseMySql(
+		connectionString,
+		new MySqlServerVersion(new Version(8, 0, 36)),
+		mySqlOptions =>
+		{
+			mySqlOptions.EnableRetryOnFailure(
+				maxRetryCount: 10,
+				maxRetryDelay: TimeSpan.FromSeconds(10),
+				errorNumbersToAdd: null
+			);
+		}
+	)
+);
 
-// Configure JWT Authentication
+#endregion
+
+#region Authentication & Authorization (JWT)
+
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
+var secretKey = jwtSettings["SecretKey"]
+	?? throw new InvalidOperationException("JWT SecretKey not configured");
 
-builder.Services.AddAuthentication(options =>
-{
-	options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-	options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-	options.TokenValidationParameters = new TokenValidationParameters
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+	.AddJwtBearer(options =>
 	{
-		ValidateIssuer = true,
-		ValidateAudience = true,
-		ValidateLifetime = true,
-		ValidateIssuerSigningKey = true,
-		ValidIssuer = jwtSettings["Issuer"] ?? "TodoTaskAPI",
-		ValidAudience = jwtSettings["Audience"] ?? "TodoTaskClient",
-		IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
-	};
-});
+		options.TokenValidationParameters = new TokenValidationParameters
+		{
+			ValidateIssuer = true,
+			ValidateAudience = true,
+			ValidateLifetime = true,
+			ValidateIssuerSigningKey = true,
+			ValidIssuer = jwtSettings["Issuer"],
+			ValidAudience = jwtSettings["Audience"],
+			IssuerSigningKey = new SymmetricSecurityKey(
+				Encoding.UTF8.GetBytes(secretKey))
+		};
+	});
 
 builder.Services.AddAuthorization();
 
-// Register services
+#endregion
+
+#region Dependency Injection
+
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
@@ -131,19 +151,22 @@ builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IReminderService, ReminderService>();
 builder.Services.AddScoped<IUserPreferencesService, UserPreferencesService>();
 
+#endregion
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
+#region Middleware Pipeline
+
 if (app.Environment.IsDevelopment())
 {
 	app.UseSwagger();
 	app.UseSwaggerUI();
 }
 
-// CORS must be before UseHttpsRedirection to handle preflight requests
+app.UseSerilogRequestLogging();
+
 app.UseCors("AllowAll");
 
-// Only use HTTPS redirection in production
 if (!app.Environment.IsDevelopment())
 {
 	app.UseHttpsRedirection();
@@ -152,22 +175,24 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Add exception handling middleware
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.MapControllers();
 
-// Ensure database is created and migrated
-using (var scope = app.Services.CreateScope())
+#endregion
+
+#region Database Migration (DEV ONLY)
+
+if (app.Environment.IsDevelopment())
 {
+	using var scope = app.Services.CreateScope();
 	var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 	var passwordService = scope.ServiceProvider.GetRequiredService<IPasswordService>();
 
-	// Apply pending migrations
 	dbContext.Database.Migrate();
-
-	// Seed sample data
 	await DataSeeder.SeedAsync(dbContext, passwordService);
 }
+
+#endregion
 
 app.Run();
