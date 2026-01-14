@@ -40,26 +40,26 @@ const getApiBaseUrl = () => {
     return process.env.EXPO_PUBLIC_API_URL;
   }
   
-  // if (__DEV__) {
-  //   // Auto-detect platform and use appropriate URL
-  //   if (Platform.OS === 'android') {
-  //     // Android emulator uses 10.0.2.2 to access host machine's localhost
-  //     const url = 'http://10.0.2.2:5000/api/v1';
-  //     console.log('Using Android dev URL:', url);
-  //     return url;
-  //   } else if (Platform.OS === 'web') {
-  //     // Web uses localhost
-  //     const url = 'http://localhost:5000/api/v1';
-  //     console.log('Using Web dev URL:', url);
-  //     return url;
-  //   } else {
-  //     // iOS simulator uses localhost
-  //     const url = 'http://localhost:5000/api/v1';
-  //     console.log('Using iOS dev URL:', url);
-  //     return url;
-  //   }
-  // }
-  const prodUrl = 'https://kmbfs58crj.execute-api.us-east-1.amazonaws.com/api/v1';
+  if (__DEV__) {
+    // Auto-detect platform and use appropriate URL
+    if (Platform.OS === 'android') {
+      // Android emulator uses 10.0.2.2 to access host machine's localhost
+      const url = 'http://10.0.2.2:5000/api/v1';
+      console.log('Using Android dev URL:', url);
+      return url;
+    } else if (Platform.OS === 'web') {
+      // Web uses localhost
+      const url = 'http://localhost:5000/api/v1';
+      console.log('Using Web dev URL:', url);
+      return url;
+    } else {
+      // iOS simulator uses localhost
+      const url = 'http://localhost:5000/api/v1';
+      console.log('Using iOS dev URL:', url);
+      return url;
+    }
+  }
+  const prodUrl = 'http://localhost:5000/api/v1';
   console.log('Using Production URL:', prodUrl);
   return prodUrl;
 };
