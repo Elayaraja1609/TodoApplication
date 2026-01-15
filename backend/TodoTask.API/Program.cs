@@ -14,6 +14,16 @@ using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+#region RAILWAY PORT BINDING (VERY IMPORTANT)
+
+var portEnv = Environment.GetEnvironmentVariable("PORT");
+var port = string.IsNullOrEmpty(portEnv) ? "8080" : portEnv;
+
+// MUST listen on 0.0.0.0
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+#endregion
+
 #region Logging (Serilog)
 
 Log.Logger = new LoggerConfiguration()
@@ -66,7 +76,7 @@ builder.Services.AddSwaggerGen(c =>
 
 #endregion
 
-#region CORS
+#region CORS (TEMP: Allow All)
 
 builder.Services.AddCors(options =>
 {
@@ -80,22 +90,21 @@ builder.Services.AddCors(options =>
 
 #endregion
 
-#region Database (Railway Safe)
+#region Database (Railway MySQL)
 
 var host = Environment.GetEnvironmentVariable("MYSQLHOST");
-var port = Environment.GetEnvironmentVariable("MYSQLPORT");
+var portDb = Environment.GetEnvironmentVariable("MYSQLPORT");
 var database = Environment.GetEnvironmentVariable("MYSQLDATABASE");
 var user = Environment.GetEnvironmentVariable("MYSQLUSER");
 var password = Environment.GetEnvironmentVariable("MYSQLPASSWORD");
 
-// Fail fast if Railway variables are missing
 if (string.IsNullOrWhiteSpace(host))
 {
 	throw new InvalidOperationException("MYSQLHOST environment variable is not set.");
 }
 
 var connectionString =
-	$"Server={host};Port={port};Database={database};User={user};Password={password};";
+	$"Server={host};Port={portDb};Database={database};User={user};Password={password};";
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 	options.UseMySql(
@@ -103,18 +112,14 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 		new MySqlServerVersion(new Version(8, 0, 36)),
 		mySqlOptions =>
 		{
-			mySqlOptions.EnableRetryOnFailure(
-				maxRetryCount: 10,
-				maxRetryDelay: TimeSpan.FromSeconds(10),
-				errorNumbersToAdd: null
-			);
+			mySqlOptions.EnableRetryOnFailure(10, TimeSpan.FromSeconds(10), null);
 		}
 	)
 );
 
 #endregion
 
-#region Authentication & Authorization (JWT)
+#region JWT Authentication
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["SecretKey"]
@@ -157,41 +162,21 @@ var app = builder.Build();
 
 #region Middleware Pipeline
 
-if (app.Environment.IsDevelopment())
-{
-	app.UseSwagger();
-	app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseSerilogRequestLogging();
 
 app.UseCors("AllowAll");
-
-if (!app.Environment.IsDevelopment())
-{
-	app.UseHttpsRedirection();
-}
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
+app.MapGet("/", () => "Todo API is running on Railway");
+
 app.MapControllers();
-
-#endregion
-
-#region Database Migration (DEV ONLY)
-
-if (app.Environment.IsDevelopment())
-{
-	using var scope = app.Services.CreateScope();
-	var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-	var passwordService = scope.ServiceProvider.GetRequiredService<IPasswordService>();
-
-	dbContext.Database.Migrate();
-	await DataSeeder.SeedAsync(dbContext, passwordService);
-}
 
 #endregion
 
