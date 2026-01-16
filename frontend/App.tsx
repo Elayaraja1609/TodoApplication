@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, ActivityIndicator, AppState, AppStateStatus } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
@@ -19,6 +19,8 @@ function AppNavigator() {
   const [showPinEntry, setShowPinEntry] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [checkingPin, setCheckingPin] = useState(true);
+  const appState = useRef(AppState.currentState);
+  const pinCheckedRef = useRef(false);
 
   useEffect(() => {
     // Request notification permissions when app starts
@@ -27,11 +29,39 @@ function AppNavigator() {
 
   useEffect(() => {
     // Check if PIN is required when user is authenticated
-    if (isAuthenticated && user) {
+    // Only check on initial mount, not when app comes back from background
+    if (isAuthenticated && user && !pinCheckedRef.current) {
       checkPinRequirement();
-    } else {
+      pinCheckedRef.current = true;
+    } else if (!isAuthenticated) {
       setCheckingPin(false);
+      pinCheckedRef.current = false;
     }
+  }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    // Handle app state changes to prevent PIN check when returning from image picker
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      // Only check PIN when app comes to foreground if it hasn't been checked yet
+      // This prevents PIN screen from showing when returning from image picker
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active' &&
+        isAuthenticated &&
+        user &&
+        !pinCheckedRef.current
+      ) {
+        // Only check if we haven't checked PIN yet (e.g., app was killed and restarted)
+        checkPinRequirement();
+        pinCheckedRef.current = true;
+      }
+      
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [isAuthenticated, user]);
 
   const requestNotificationPermissions = async () => {
@@ -115,6 +145,8 @@ function AppNavigator() {
       <PinEntryScreen
         onSuccess={() => {
           setShowPinEntry(false);
+          // PIN was successfully verified, mark as checked for this session
+          pinCheckedRef.current = true;
         }}
       />
     );

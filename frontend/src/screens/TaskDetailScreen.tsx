@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   Image,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, isToday } from 'date-fns';
@@ -676,7 +677,11 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onClose} style={styles.backButton}>
@@ -689,6 +694,8 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
       <ScrollView 
         style={styles.content} 
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}
       >
         {/* Task Title */}
         <View style={styles.section}>
@@ -1109,7 +1116,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
           setShowCategoriesModal(true);
         }}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -1140,6 +1147,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   section: {
     marginBottom: 16,
