@@ -40,26 +40,26 @@ const getApiBaseUrl = () => {
     return process.env.EXPO_PUBLIC_API_URL;
   }
   
-  if (__DEV__) {
-    // Auto-detect platform and use appropriate URL
-    if (Platform.OS === 'android') {
-      // Android emulator uses 10.0.2.2 to access host machine's localhost
-      const url = 'http://10.0.2.2:5000/api/v1';
-      console.log('Using Android dev URL:', url);
-      return url;
-    } else if (Platform.OS === 'web') {
-      // Web uses localhost
-      const url = 'http://localhost:5000/api/v1';
-      console.log('Using Web dev URL:', url);
-      return url;
-    } else {
-      // iOS simulator uses localhost
-      const url = 'http://localhost:5000/api/v1';
-      console.log('Using iOS dev URL:', url);
-      return url;
-    }
-  }
-  const prodUrl = 'http://localhost:5000/api/v1';
+  // if (__DEV__) {
+  //   // Auto-detect platform and use appropriate URL
+  //   if (Platform.OS === 'android') {
+  //     // Android emulator uses 10.0.2.2 to access host machine's localhost
+  //     const url = 'http://10.0.2.2:5000/api/v1';
+  //     console.log('Using Android dev URL:', url);
+  //     return url;
+  //   } else if (Platform.OS === 'web') {
+  //     // Web uses localhost
+  //     const url = 'http://localhost:5000/api/v1';
+  //     console.log('Using Web dev URL:', url);
+  //     return url;
+  //   } else {
+  //     // iOS simulator uses localhost
+  //     const url = 'http://localhost:5000/api/v1';
+  //     console.log('Using iOS dev URL:', url);
+  //     return url;
+  //   }
+  // }
+  const prodUrl = 'https://todoapplication-production-d2ca.up.railway.app/api/v1';
   console.log('Using Production URL:', prodUrl);
   return prodUrl;
 };
@@ -103,10 +103,18 @@ class ApiService {
       (error) => Promise.reject(error)
     );
 
-    // Add response interceptor for token refresh
+    // Add response interceptor for token refresh and error handling
     this.api.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
+        // Handle network errors and other axios errors
+        if (!error.response) {
+          // Network error or timeout
+          console.error('Network error:', error.message);
+          const networkError = new Error('Network error. Please check your internet connection.');
+          (networkError as any).isNetworkError = true;
+          return Promise.reject(networkError);
+        }
         if (error.response?.status === 401) {
           // Token expired, try to refresh
           try {

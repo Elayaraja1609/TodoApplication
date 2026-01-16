@@ -24,6 +24,7 @@ export const PinSetupScreen: React.FC<PinSetupScreenProps> = ({ onComplete }) =>
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async () => {
     if (pin.length < 4) {
@@ -46,24 +47,28 @@ export const PinSetupScreen: React.FC<PinSetupScreenProps> = ({ onComplete }) =>
         const updatedUser = { ...user, hasPin: true };
         await StorageService.saveUserData(updatedUser);
       }
-      // Show success message and navigate to home
-      Alert.alert(
-        'Success',
-        'PIN setup successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Clear form
-              setPin('');
-              setConfirmPin('');
-              // Navigate to home
-              onComplete();
-            },
-          },
-        ],
-        { cancelable: false }
-      );
+      
+      // Show success message
+      setSuccess(true);
+      
+      // Show alert for better visibility (works on mobile)
+      if (Platform.OS !== 'web') {
+        Alert.alert(
+          'Success',
+          'PIN setup successfully!',
+          [{ text: 'OK' }],
+          { cancelable: false }
+        );
+      }
+      
+      // Clear form
+      setPin('');
+      setConfirmPin('');
+      
+      // Navigate to home after a short delay to show success message
+      setTimeout(() => {
+        onComplete();
+      }, 1500);
     } catch (error: any) {
       console.error('PIN setup error:', error);
       Alert.alert('Error', error.response?.data?.message || 'Failed to setup PIN. Please try again.');
@@ -79,12 +84,30 @@ export const PinSetupScreen: React.FC<PinSetupScreenProps> = ({ onComplete }) =>
     >
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Ionicons name="lock-closed" size={64} color="#f97316" />
+          <Ionicons 
+            name={success ? "checkmark-circle" : "lock-closed"} 
+            size={64} 
+            color={success ? "#10b981" : "#f97316"} 
+          />
         </View>
-        <Text style={styles.title}>Setup PIN</Text>
-        <Text style={styles.subtitle}>Enter a 4-digit PIN to secure your app</Text>
+        <Text style={styles.title}>
+          {success ? 'PIN Setup Successful!' : 'Setup PIN'}
+        </Text>
+        <Text style={styles.subtitle}>
+          {success 
+            ? 'Your PIN has been set successfully. Redirecting to home...' 
+            : 'Enter a 4-digit PIN to secure your app'}
+        </Text>
 
-        <View style={styles.form}>
+        {success && (
+          <View style={styles.successContainer}>
+            <Ionicons name="checkmark-circle" size={48} color="#10b981" />
+            <Text style={styles.successText}>PIN setup successfully!</Text>
+          </View>
+        )}
+
+        {!success && (
+          <View style={styles.form}>
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Enter PIN</Text>
             <TextInput
@@ -116,7 +139,7 @@ export const PinSetupScreen: React.FC<PinSetupScreenProps> = ({ onComplete }) =>
           <TouchableOpacity
             style={styles.button}
             onPress={handleSubmit}
-            disabled={loading}
+            disabled={loading || success}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -125,6 +148,7 @@ export const PinSetupScreen: React.FC<PinSetupScreenProps> = ({ onComplete }) =>
             )}
           </TouchableOpacity>
         </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -191,6 +215,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  successContainer: {
+    alignItems: 'center',
+    marginTop: 24,
+    padding: 20,
+    backgroundColor: '#065f46',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#10b981',
+  },
+  successText: {
+    color: '#10b981',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 12,
+    textAlign: 'center',
   },
 });
 

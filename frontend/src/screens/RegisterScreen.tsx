@@ -23,6 +23,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleRegister = async () => {
     if (!firstName || !lastName || !email || !password) {
@@ -41,37 +42,52 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
       await apiService.register({ firstName, lastName, email, password });
       
       // Show success message
-      Alert.alert(
-        'Success',
-        'Registered successfully! Please login to continue.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Clear form
-              setFirstName('');
-              setLastName('');
-              setEmail('');
-              setPassword('');
-              // Navigate to login screen
-              onNavigateToLogin?.();
-            },
-          },
-        ]
-      );
+      setSuccess(true);
+      
+      // Show alert for better visibility (works on mobile)
+      if (Platform.OS !== 'web') {
+        Alert.alert(
+          'Success',
+          'Registered successfully! Please login to continue.',
+          [{ text: 'OK' }]
+        );
+      }
+      
+      // Clear form
+      setFirstName('');
+      setLastName('');
+      setEmail('');
+      setPassword('');
+      
+      // Navigate to login screen after a short delay to show success message
+      setTimeout(() => {
+        onNavigateToLogin?.();
+      }, 2000);
     } catch (error: any) {
       console.error('Registration error:', error);
       let errorMessage = 'Registration failed. Please try again.';
       
-      if (error.response) {
+      // Handle different error types
+      if (error.isNetworkError || error.message?.includes('Network error')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.response) {
         errorMessage = error.response.data?.message || error.response.data?.error || `Server error: ${error.response.status}`;
       } else if (error.request) {
-        errorMessage = 'Unable to connect to server. Please check your connection and ensure the backend is running.';
-      } else {
-        errorMessage = error.message || 'An unexpected error occurred';
+        errorMessage = 'Unable to connect to server. Please check your internet connection.';
+      } else if (error.message) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Request timeout. Please check your internet connection.';
+        } else {
+          errorMessage = error.message;
+        }
       }
       
-      Alert.alert('Registration Failed', errorMessage);
+      // Show error alert - wrapped in try-catch to prevent crashes
+      try {
+        Alert.alert('Registration Failed', errorMessage);
+      } catch (alertError) {
+        console.error('Failed to show alert:', alertError);
+      }
     } finally {
       setLoading(false);
     }
@@ -84,14 +100,31 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
     >
       <View style={styles.content}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>Sign up</Text>
-          <TouchableOpacity>
-            <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
-          </TouchableOpacity>
+          <Text style={styles.title}>
+            {success ? 'Registration Successful!' : 'Sign up'}
+          </Text>
+          {!success && (
+            <TouchableOpacity>
+              <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
-        <Text style={styles.subtitle}>Sign up to save your information</Text>
+        <Text style={styles.subtitle}>
+          {success 
+            ? 'Your account has been created successfully. Redirecting to login...' 
+            : 'Sign up to save your information'}
+        </Text>
 
-        <View style={styles.form}>
+        {success && (
+          <View style={styles.successContainer}>
+            <Ionicons name="checkmark-circle" size={64} color="#10b981" />
+            <Text style={styles.successText}>Registration successful!</Text>
+            <Text style={styles.successSubtext}>Please login to continue</Text>
+          </View>
+        )}
+
+        {!success && (
+          <View style={styles.form}>
           <TextInput
             style={styles.input}
             placeholder="First Name"
@@ -134,7 +167,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
           <TouchableOpacity
             style={styles.button}
             onPress={handleRegister}
-            disabled={loading}
+            disabled={loading || success}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -167,6 +200,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
             <Text style={styles.skipText}>Continue without creating an account</Text>
           </TouchableOpacity>
         </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -269,6 +303,28 @@ const styles = StyleSheet.create({
   skipText: {
     color: '#f97316',
     fontSize: 14,
+    textAlign: 'center',
+  },
+  successContainer: {
+    alignItems: 'center',
+    marginTop: 24,
+    padding: 32,
+    backgroundColor: '#065f46',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#10b981',
+  },
+  successText: {
+    color: '#10b981',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  successSubtext: {
+    color: '#6ee7b7',
+    fontSize: 16,
+    marginTop: 8,
     textAlign: 'center',
   },
 });

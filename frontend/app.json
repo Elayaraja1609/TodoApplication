@@ -14,7 +14,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.todotask.app"
+      "bundleIdentifier": "com.todotask.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,9 +25,14 @@
       },
       "package": "com.todotask.app",
       "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "SCHEDULE_EXACT_ALARM"
+        "SCHEDULE_EXACT_ALARM",
+        "POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -42,6 +50,12 @@
       "expo-font",
       "expo-audio"
     ],
-    "scheme": "todotask"
+    "scheme": "todotask",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2be54f80-4727-4d3f-94dc-2c5358b93adb"
+      }
+    }
   }
 }

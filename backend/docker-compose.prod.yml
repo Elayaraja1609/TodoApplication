@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # MySQL Database (Production)
+  mysql:
+    image: mysql:8.0
+    container_name: todo-task-mysql-prod
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: TodoTaskDB
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data_prod:/var/lib/mysql
+    networks:
+      - todo-task-network-prod
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password
+
+  # .NET API (Production)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: todo-task-api-prod
+    restart: always
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=${DATABASE_CONNECTION_STRING}
+      - JwtSettings__SecretKey=${JWT_SECRET_KEY}
+      - JwtSettings__Issuer=${JWT_ISSUER}
+      - JwtSettings__Audience=${JWT_AUDIENCE}
+      - JwtSettings__ExpiryMinutes=${JWT_EXPIRY_MINUTES}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - todo-task-network-prod
+    healthcheck:
+      # Note: Install curl in Dockerfile or use wget if health endpoint exists
+      # test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      # Or simply check if process is running:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mysql_data_prod:
+    driver: local
+
+networks:
+  todo-task-network-prod:
+    driver: bridge
+

@@ -30,31 +30,35 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
 
     setLoading(true);
     try {
-      // Add timeout wrapper to prevent indefinite hanging
-      const loginPromise = login({ email, password });
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout. Please check if the backend server is running.')), 15000)
-      );
-      
-      await Promise.race([loginPromise, timeoutPromise]);
+      await login({ email, password });
+      // Login successful - navigation handled by AuthContext
     } catch (error: any) {
       console.error('Login error:', error);
       let errorMessage = 'Login failed. Please try again.';
       
-      if (error.response) {
+      // Handle different error types
+      if (error.isNetworkError || error.message?.includes('Network error')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.response) {
         // Server responded with error
         errorMessage = error.response.data?.message || error.response.data?.error || `Server error: ${error.response.status}`;
       } else if (error.request) {
         // Request made but no response received
-        errorMessage = 'Unable to connect to server. Please check:\n1. Backend is running on port 5000\n2. Device and computer are on the same network\n3. Firewall allows connections';
-      } else if (error.message && error.message.includes('timeout')) {
-        errorMessage = error.message;
-      } else {
-        // Something else happened
-        errorMessage = error.message || 'An unexpected error occurred';
+        errorMessage = 'Unable to connect to server. Please check your internet connection.';
+      } else if (error.message) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Request timeout. Please check your internet connection.';
+        } else {
+          errorMessage = error.message;
+        }
       }
       
-      Alert.alert('Login Failed', errorMessage);
+      // Show error alert - wrapped in try-catch to prevent crashes
+      try {
+        Alert.alert('Login Failed', errorMessage);
+      } catch (alertError) {
+        console.error('Failed to show alert:', alertError);
+      }
     } finally {
       setLoading(false);
     }
