@@ -8,6 +8,8 @@ import {
   ScrollView,
   Alert,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../services/api';
@@ -199,7 +201,11 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
           animationType="slide"
           onRequestClose={() => setShowAddModal(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          >
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>
                 {editingCategory ? 'Edit Category' : 'New Category'}
@@ -272,7 +278,7 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </View>
     </Modal>
