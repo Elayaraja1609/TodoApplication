@@ -15,9 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, isToday } from 'date-fns';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { apiService } from '../services/api';
 import { NotificationService } from '../services/notificationService';
 import { StorageService } from '../services/storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { Todo, Category, Reminder } from '../types';
 import { RecurrenceModal } from '../components/RecurrenceModal';
 import { CategoryModal } from '../components/CategoryModal';
@@ -26,20 +29,54 @@ import { CalendarPicker } from '../components/CalendarPicker';
 import { TimePicker } from '../components/TimePicker';
 import { ReminderPicker } from '../components/ReminderPicker';
 
+type RootStackParamList = {
+  Home: undefined;
+  TaskDetail: { todoId?: number; isCompleted?: boolean };
+};
+
+type TaskDetailRouteProp = RouteProp<RootStackParamList, 'TaskDetail'>;
+type TaskDetailNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 interface TaskDetailScreenProps {
+  // These props are now passed via route params, but keeping for backward compatibility
   todoId?: number;
-  onClose: () => void;
-  onSave: () => void;
-  isCompleted?: boolean; // Indicates if the task is completed (read-only mode)
+  onClose?: () => void;
+  onSave?: () => void;
+  isCompleted?: boolean;
+  onImagePickerStateChange?: (isActive: boolean) => void;
 }
 
 export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
-  todoId,
-  onClose,
-  onSave,
+  todoId: propTodoId,
+  onClose: propOnClose,
+  onSave: propOnSave,
   isCompleted: propIsCompleted,
+  onImagePickerStateChange,
 }) => {
-  const [isCompleted, setIsCompleted] = useState(propIsCompleted || false);
+  const navigation = useNavigation<TaskDetailNavigationProp>();
+  const route = useRoute<TaskDetailRouteProp>();
+  
+  // Get params from route, fallback to props for backward compatibility
+  const routeTodoId = route.params?.todoId ?? propTodoId;
+  const routeIsCompleted = route.params?.isCompleted ?? propIsCompleted ?? false;
+  
+  // Navigation-based handlers
+  const handleClose = () => {
+    if (propOnClose) {
+      propOnClose();
+    } else {
+      navigation.goBack();
+    }
+  };
+  
+  const handleSaveCallback = () => {
+    if (propOnSave) {
+      propOnSave();
+    }
+    // Navigation will handle going back automatically
+  };
+  
+  const [isCompleted, setIsCompleted] = useState(routeIsCompleted);
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [categoryName, setCategoryName] = useState('Home');
@@ -75,7 +112,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
 
   useEffect(() => {
     loadCategories();
-    if (todoId) {
+    if (routeTodoId) {
       loadTodo();
     } else {
       // For new tasks, apply default task date preference
@@ -115,7 +152,23 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
         clearInterval(durationInterval.current);
       }
     };
-  }, [todoId]);
+  }, [routeTodoId]);
+
+  // Track current screen state when TaskDetailScreen is focused
+  // This helps preserve the screen when returning from image picker
+  useFocusEffect(
+    React.useCallback(() => {
+      // Set current screen state to 'TaskDetail' when screen is focused
+      StorageService.setItem('lastActiveScreen', 'TaskDetail');
+      // DEBUG: Show alert with current state
+      Alert.alert('Debug: TaskDetailScreen Focus', `State set to: TaskDetail\nScreen: TaskDetailScreen\nTodoId: ${routeTodoId || 'New Task'}`);
+      
+      return () => {
+        // Optional: Clear state when screen loses focus (if navigating away)
+        // But we'll keep it to handle app state changes
+      };
+    }, [routeTodoId])
+  );
 
   const loadCategories = async () => {
     try {
@@ -167,9 +220,10 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
   };
 
   const loadTodo = async () => {
-    if (!todoId) return;
+    const currentTodoId = routeTodoId;
+    if (!currentTodoId) return;
     try {
-      const todo = await apiService.getTodo(todoId);
+      const todo = await apiService.getTodo(currentTodoId);
       setTitle(todo.title);
       setDescription(todo.description || '');
       setCategoryId(todo.categoryId || null);
@@ -192,7 +246,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
       // Load reminder for this task
       try {
         const reminders = await apiService.getReminders();
-        const taskReminder = reminders.find(r => r.todoId === todoId && !r.isCompleted);
+        const taskReminder = reminders.find(r => r.todoId === currentTodoId && !r.isCompleted);
         if (taskReminder && taskReminder.reminderTime) {
           const reminderDateTime = new Date(taskReminder.reminderTime);
           // Set reminder date (date part only)
@@ -250,8 +304,8 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
 
       await apiService.createTodo(taskData);
       Alert.alert('Success', 'Task duplicated successfully');
-      onSave();
-      onClose();
+      handleSave();
+      handleClose();
     } catch (error: any) {
       console.error('Failed to duplicate task:', error);
       Alert.alert('Error', 'Failed to duplicate task. Please try again.');
@@ -292,16 +346,17 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
       };
 
       let savedTodo: Todo;
-      if (todoId) {
+      const currentTodoId = routeTodoId;
+      if (currentTodoId) {
         // Cancel existing reminder notifications before updating
         try {
           const existingReminders = await apiService.getReminders();
-          const taskReminders = existingReminders.filter(r => r.todoId === todoId);
+          const taskReminders = existingReminders.filter(r => r.todoId === currentTodoId);
           for (const reminder of taskReminders) {
             const notificationIds = await NotificationService.getScheduledNotifications();
             for (const notification of notificationIds) {
               if (notification.content.data?.reminderId === reminder.id || 
-                  notification.content.data?.todoId === todoId) {
+                  notification.content.data?.todoId === currentTodoId) {
                 await NotificationService.cancelNotification(notification.identifier);
               }
             }
@@ -311,7 +366,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
         } catch (error) {
           console.error('Error canceling existing reminder notifications:', error);
         }
-        savedTodo = await apiService.updateTodo(todoId, taskData);
+        savedTodo = await apiService.updateTodo(currentTodoId, taskData);
       } else {
         savedTodo = await apiService.createTodo(taskData);
       }
@@ -399,9 +454,9 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
         }
       }
 
-      Alert.alert('Success', todoId ? 'Task updated successfully' : 'Task created successfully');
-      onSave();
-      onClose();
+      Alert.alert('Success', currentTodoId ? 'Task updated successfully' : 'Task created successfully');
+      handleSaveCallback();
+      handleClose();
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to save task');
     } finally {
@@ -410,7 +465,8 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
   };
 
   const handleDelete = async () => {
-    if (!todoId) return;
+    const currentTodoId = routeTodoId;
+    if (!currentTodoId) return;
     
     Alert.alert(
       'Delete Task',
@@ -425,13 +481,13 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
               // Get reminders for this task and cancel their notifications
               try {
                 const reminders = await apiService.getReminders();
-                const taskReminders = reminders.filter(r => r.todoId === todoId);
+                const taskReminders = reminders.filter(r => r.todoId === currentTodoId);
                 for (const reminder of taskReminders) {
                   // Cancel all scheduled notifications for this reminder
                   const notificationIds = await NotificationService.getScheduledNotifications();
                   for (const notification of notificationIds) {
                     if (notification.content.data?.reminderId === reminder.id || 
-                        notification.content.data?.todoId === todoId) {
+                        notification.content.data?.todoId === currentTodoId) {
                       await NotificationService.cancelNotification(notification.identifier);
                     }
                   }
@@ -442,9 +498,9 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
                 console.error('Error canceling reminder notifications:', error);
               }
 
-              await apiService.deleteTodo(todoId);
-              onSave();
-              onClose();
+              await apiService.deleteTodo(currentTodoId);
+              handleSaveCallback();
+              handleClose();
             } catch (error: any) {
               Alert.alert('Error', 'Failed to delete task');
             }
@@ -643,12 +699,15 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
   // Image Picker Functions
   const pickImage = async () => {
     try {
+      // Notify parent that image picker is opening
+      onImagePickerStateChange?.(true);
+      
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
-        allowsMultipleSelection: true,
+        allowsMultipleSelection: false,
       });
 
       if (!result.canceled && result.assets.length > 0) {
@@ -658,6 +717,12 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
     } catch (err) {
       console.error('Failed to pick image', err);
       Alert.alert('Error', 'Failed to pick image');
+    } finally {
+      // Notify parent that image picker is closed
+      // Use a delay to ensure the app has returned to foreground
+      setTimeout(() => {
+        onImagePickerStateChange?.(false);
+      }, 500);
     }
   };
 
@@ -684,10 +749,10 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onClose} style={styles.backButton}>
+        <TouchableOpacity onPress={handleClose} style={styles.backButton}>
           <Ionicons name="chevron-down" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{title || (todoId ? 'Edit Task' : 'New Task')}</Text>
+        <Text style={styles.headerTitle}>{title || (routeTodoId !== undefined ? 'Edit Task' : 'New Task')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -705,7 +770,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
             placeholderTextColor="#9ca3af"
             value={title}
             onChangeText={setTitle}
-            autoFocus={!todoId && !isCompleted}
+            autoFocus={routeTodoId === undefined && !isCompleted}
             editable={!isCompleted}
           />
         </View>
@@ -1018,7 +1083,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
           <>
             <TouchableOpacity 
               style={styles.cancelButton} 
-              onPress={onClose}
+              onPress={handleClose}
               disabled={loading}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -1029,7 +1094,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
               disabled={loading}
             >
               <Text style={styles.saveUpdateButtonText}>
-                {todoId ? 'Update' : 'Save'}
+                {routeTodoId !== undefined ? 'Update' : 'Save'}
               </Text>
             </TouchableOpacity>
           </>
@@ -1244,6 +1309,7 @@ const styles = StyleSheet.create({
   },
   attachmentSection: {
     marginBottom: 8,
+    display: 'none',
   },
   audioItem: {
     marginBottom: 12,

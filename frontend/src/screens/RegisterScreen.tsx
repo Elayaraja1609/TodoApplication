@@ -182,23 +182,6 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
           >
             <Text style={styles.linkText}>LOG IN</Text>
           </TouchableOpacity>
-
-          <Text style={styles.socialText}>Log in with</Text>
-          <View style={styles.socialButtons}>
-            <TouchableOpacity style={styles.socialButton}>
-              <Text style={styles.socialIcon}>f</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton}>
-              <Text style={styles.socialIcon}>G</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton}>
-              <Ionicons name="logo-apple" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity style={styles.skipButton}>
-            <Text style={styles.skipText}>Continue without creating an account</Text>
-          </TouchableOpacity>
         </View>
         )}
       </View>

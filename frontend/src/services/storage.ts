@@ -16,7 +16,8 @@ const STORAGE_KEYS = {
   CATEGORIES: '@categories',
   REMINDERS: '@reminders',
   LAST_SYNC: '@lastSync',
-  PIN: 'userPin', // PIN stored in SecureStore
+  PIN: 'userPin', 
+  PIN_UNLOCKED: '@pinUnlocked'
 };
 
 export class StorageService {
@@ -163,71 +164,102 @@ export class StorageService {
     return await AsyncStorage.getItem(STORAGE_KEYS.LAST_SYNC);
   }
 
-          // PIN storage (secure storage)
-          static async savePin(pin: string): Promise<void> {
-            try {
-              if (SecureStore && Platform.OS !== 'web') {
-                await SecureStore.setItemAsync(STORAGE_KEYS.PIN, pin);
-              } else {
-                // For web, use AsyncStorage (less secure but functional)
-                await AsyncStorage.setItem(STORAGE_KEYS.PIN, pin);
-              }
-            } catch (error) {
-              console.error('Error saving PIN:', error);
-              throw error;
-            }
-          }
+  // PIN storage (secure storage)
+  static async savePin(pin: string): Promise<void> {
+    try {
+      if (SecureStore && Platform.OS !== 'web') {
+        await SecureStore.setItemAsync(STORAGE_KEYS.PIN, pin);
+      } else {
+        // For web, use AsyncStorage (less secure but functional)
+        await AsyncStorage.setItem(STORAGE_KEYS.PIN, pin);
+      }
+    } catch (error) {
+      console.error('Error saving PIN:', error);
+      throw error;
+    }
+  }
 
-          static async getPin(): Promise<string | null> {
-            try {
-              if (SecureStore && Platform.OS !== 'web') {
-                return await SecureStore.getItemAsync(STORAGE_KEYS.PIN);
-              } else {
-                return await AsyncStorage.getItem(STORAGE_KEYS.PIN);
-              }
-            } catch (error) {
-              console.error('Error getting PIN:', error);
-              return null;
-            }
-          }
+  static async getPin(): Promise<string | null> {
+    try {
+      if (SecureStore && Platform.OS !== 'web') {
+        return await SecureStore.getItemAsync(STORAGE_KEYS.PIN);
+      } else {
+        return await AsyncStorage.getItem(STORAGE_KEYS.PIN);
+      }
+    } catch (error) {
+      console.error('Error getting PIN:', error);
+      return null;
+    }
+  }
 
-          static async clearPin(): Promise<void> {
-            try {
-              if (SecureStore && Platform.OS !== 'web') {
-                await SecureStore.deleteItemAsync(STORAGE_KEYS.PIN);
-              } else {
-                await AsyncStorage.removeItem(STORAGE_KEYS.PIN);
-              }
-            } catch (error) {
-              console.error('Error clearing PIN:', error);
-            }
-          }
+  static async clearPin(): Promise<void> {
+    try {
+      if (SecureStore && Platform.OS !== 'web') {
+        await SecureStore.deleteItemAsync(STORAGE_KEYS.PIN);
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEYS.PIN);
+      }
+    } catch (error) {
+      console.error('Error clearing PIN:', error);
+    }
+  }
 
-          // Generic item storage
-          static async setItem(key: string, value: string): Promise<void> {
-            await AsyncStorage.setItem(key, value);
-          }
+  // PIN unlock state (NOT sensitive)
+static async setPinUnlocked(value: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.PIN_UNLOCKED,
+      value ? 'true' : 'false'
+    );
+  } catch (error) {
+    console.error('Error setting pin unlocked state:', error);
+  }
+}
 
-          static async getItem(key: string): Promise<string | null> {
-            return await AsyncStorage.getItem(key);
-          }
+static async getPinUnlocked(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(STORAGE_KEYS.PIN_UNLOCKED);
+    return value === 'true';
+  } catch (error) {
+    console.error('Error getting pin unlocked state:', error);
+    return false;
+  }
+}
 
-          static async removeItem(key: string): Promise<void> {
-            await AsyncStorage.removeItem(key);
-          }
+static async clearPinUnlocked(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.PIN_UNLOCKED);
+  } catch (error) {
+    console.error('Error clearing pin unlocked state:', error);
+  }
+}
 
-          // Clear all local data
-          static async clearAll(): Promise<void> {
-            await AsyncStorage.multiRemove([
-              STORAGE_KEYS.TODOS,
-              STORAGE_KEYS.CATEGORIES,
-              STORAGE_KEYS.REMINDERS,
-              STORAGE_KEYS.LAST_SYNC,
-              'userData', // User data stored separately
-              'theme', // Theme preference
-            ]);
-            await this.clearAuthTokens();
-            await this.clearPin();
-          }
-        }
+
+  // Generic item storage
+  static async setItem(key: string, value: string): Promise<void> {
+    await AsyncStorage.setItem(key, value);
+  }
+
+  static async getItem(key: string): Promise<string | null> {
+    return await AsyncStorage.getItem(key);
+  }
+
+  static async removeItem(key: string): Promise<void> {
+    await AsyncStorage.removeItem(key);
+  }
+
+  // Clear all local data
+  static async clearAll(): Promise<void> {
+    await AsyncStorage.multiRemove([
+      STORAGE_KEYS.TODOS,
+      STORAGE_KEYS.CATEGORIES,
+      STORAGE_KEYS.REMINDERS,
+      STORAGE_KEYS.LAST_SYNC,
+      'userData', // User data stored separately
+      'theme', // Theme preference
+    ]);
+    await this.clearAuthTokens();
+    await this.clearPin();
+  }
+}
 

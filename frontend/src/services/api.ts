@@ -59,7 +59,7 @@ const getApiBaseUrl = () => {
   //     return url;
   //   }
   // }
-  const prodUrl = 'http://localhost:5000/api/v1';
+  const prodUrl = 'https://todoapplication-production-d2ca.up.railway.app/api/v1';
   console.log('Using Production URL:', prodUrl);
   return prodUrl;
 };

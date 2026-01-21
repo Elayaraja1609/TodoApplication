@@ -50,6 +50,8 @@ export const PinEntryScreen: React.FC<PinEntryScreenProps> = ({ onSuccess }) => 
           const response = await apiService.verifyPin({ pin: pinToVerify });
           if (response.isValid) {
             setPin('');
+            // Mark PIN as unlocked for this session
+            await StorageService.setPinUnlocked(true);
             // PIN verified successfully, navigate directly to home
             onSuccess();
             return;
@@ -60,6 +62,8 @@ export const PinEntryScreen: React.FC<PinEntryScreenProps> = ({ onSuccess }) => 
           // The token will be refreshed on next API call if needed
           console.warn('Backend PIN verification failed, but local PIN matches:', backendError);
           setPin('');
+          // Mark PIN as unlocked for this session
+          await StorageService.setPinUnlocked(true);
           // PIN verified locally, navigate directly to home
           onSuccess();
           return;
@@ -70,6 +74,8 @@ export const PinEntryScreen: React.FC<PinEntryScreenProps> = ({ onSuccess }) => 
         if (response.isValid) {
           // Save to local storage for next time
           await StorageService.savePin(pinToVerify);
+          // Mark PIN as unlocked for this session
+          await StorageService.setPinUnlocked(true);
           setPin('');
           // PIN verified successfully, navigate directly to home
           onSuccess();
@@ -90,6 +96,8 @@ export const PinEntryScreen: React.FC<PinEntryScreenProps> = ({ onSuccess }) => 
         const storedPin = await StorageService.getPin();
         if (storedPin && storedPin === pinToVerify) {
           // Local PIN matches, allow access (token will be refreshed on next API call)
+          // Mark PIN as unlocked for this session
+          await StorageService.setPinUnlocked(true);
           setPin('');
           onSuccess();
           return;

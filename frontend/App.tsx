@@ -1,68 +1,121 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ActivityIndicator, AppState, AppStateStatus } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, AppState, AppStateStatus, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RegisterScreen } from './src/screens/RegisterScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
-import { PinEntryScreen } from './src/screens/PinEntryScreen';
-import { PinSetupScreen } from './src/screens/PinSetupScreen';
-import { apiService } from './src/services/api';
-import { StorageService } from './src/services/storage';
+import { TaskDetailScreen } from './src/screens/TaskDetailScreen';
 import { NotificationService } from './src/services/notificationService';
+import { StorageService } from './src/services/storage';
+
+const Stack = createNativeStackNavigator();
+
+function AuthNavigator() {
+  const [showRegister, setShowRegister] = useState(false);
+
+  return (
+    <>
+      {showRegister ? (
+        <RegisterScreen
+          onNavigateToLogin={() => setShowRegister(false)}
+        />
+      ) : (
+        <LoginScreen
+          onNavigateToRegister={() => setShowRegister(true)}
+        />
+      )}
+    </>
+  );
+}
+
+function MainNavigator() {
+  const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
+  const appStateRef = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
+      const previousState = appStateRef.current;
+      appStateRef.current = nextAppState;
+
+      // When app comes to foreground (from background)
+      if (previousState.match(/inactive|background/) && nextAppState === 'active') {
+        if (navigationRef.current?.isReady()) {
+          // Check what screen we were on before going to background
+          const lastScreen = await StorageService.getItem('lastActiveScreen');
+          
+          // DEBUG: Show alert with current state
+          Alert.alert(
+            'Debug: App State Change',
+            `Previous State: ${previousState}\nCurrent State: ${nextAppState}\nLast Active Screen: ${lastScreen || 'null'}\n\nAction: ${lastScreen === 'TaskDetail' ? 'Staying on TaskDetail' : 'Navigating to Home'}`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  if (lastScreen === 'TaskDetail') {
+                    // Stay on TaskDetail screen - don't navigate
+                    // React Navigation should preserve the screen state automatically
+                    console.log('Preserving TaskDetail screen state');
+                  } else {
+                    // Navigate to Home if we were on Home or no state stored
+                    const nav = navigationRef.current;
+                    if (nav && nav.isReady()) {
+                      nav.navigate('Home');
+                    }
+                  }
+                }
+              }
+            ]
+          );
+        }
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  return (
+    <NavigationContainer ref={navigationRef}>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: '#1e1b4b' },
+        }}
+      >
+        <Stack.Screen 
+          name="Home" 
+          component={HomeScreen}
+        />
+        <Stack.Screen
+          name="TaskDetail"
+          component={TaskDetailScreen}
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+            gestureEnabled: true,
+            headerShown: false,
+          }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+type RootStackParamList = {
+  Home: undefined;
+  TaskDetail: { todoId?: number; isCompleted?: boolean };
+};
 
 function AppNavigator() {
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const [showRegister, setShowRegister] = useState(false);
-  const [showPinEntry, setShowPinEntry] = useState(false);
-  const [showPinSetup, setShowPinSetup] = useState(false);
-  const [checkingPin, setCheckingPin] = useState(true);
-  const appState = useRef(AppState.currentState);
-  const pinCheckedRef = useRef(false);
+  const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     // Request notification permissions when app starts
     requestNotificationPermissions();
   }, []);
-
-  useEffect(() => {
-    // Check if PIN is required when user is authenticated
-    // Only check on initial mount, not when app comes back from background
-    if (isAuthenticated && user && !pinCheckedRef.current) {
-      checkPinRequirement();
-      pinCheckedRef.current = true;
-    } else if (!isAuthenticated) {
-      setCheckingPin(false);
-      pinCheckedRef.current = false;
-    }
-  }, [isAuthenticated, user]);
-
-  useEffect(() => {
-    // Handle app state changes to prevent PIN check when returning from image picker
-    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      // Only check PIN when app comes to foreground if it hasn't been checked yet
-      // This prevents PIN screen from showing when returning from image picker
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === 'active' &&
-        isAuthenticated &&
-        user &&
-        !pinCheckedRef.current
-      ) {
-        // Only check if we haven't checked PIN yet (e.g., app was killed and restarted)
-        checkPinRequirement();
-        pinCheckedRef.current = true;
-      }
-      
-      appState.current = nextAppState;
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [isAuthenticated, user]);
 
   const requestNotificationPermissions = async () => {
     try {
@@ -77,46 +130,7 @@ function AppNavigator() {
     }
   };
 
-  const checkPinRequirement = async () => {
-    try {
-      // Check if user has PIN set in backend
-      // This requires a valid token, so if token is expired, it will fail
-      const response = await apiService.hasPin();
-      if (response.hasPin) {
-        // PIN exists, show PIN entry screen
-        setShowPinEntry(true);
-      } else {
-        // User doesn't have PIN, show setup screen (first-time login)
-        setShowPinSetup(true);
-      }
-    } catch (error: any) {
-      console.error('Error checking PIN requirement:', error);
-      // If error is 401 (Unauthorized), token might be expired
-      // In this case, we should still show PIN entry if user has token stored
-      // The PIN verification will handle token refresh if needed
-      if (error.response?.status === 401) {
-        // Token expired, but user might still have PIN set
-        // Check local storage for PIN
-        const localPin = await StorageService.getPin();
-        if (localPin) {
-          // Show PIN entry - if token is expired, user will need to re-login
-          setShowPinEntry(true);
-        } else {
-          // No PIN locally, proceed to home (user will need to re-login if token expired)
-          setCheckingPin(false);
-        }
-      } else {
-        // Other error, proceed to home screen
-        setCheckingPin(false);
-      }
-    } finally {
-      if (!showPinEntry && !showPinSetup) {
-        setCheckingPin(false);
-      }
-    }
-  };
-
-  if (isLoading || checkingPin) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#f97316" />
@@ -125,45 +139,10 @@ function AppNavigator() {
   }
 
   if (!isAuthenticated) {
-    if (showRegister) {
-      return (
-        <RegisterScreen
-          onNavigateToLogin={() => setShowRegister(false)}
-        />
-      );
-    }
-    return (
-      <LoginScreen
-        onNavigateToRegister={() => setShowRegister(true)}
-      />
-    );
+    return <AuthNavigator />;
   }
 
-  // Show PIN entry screen if PIN is required
-  if (showPinEntry) {
-    return (
-      <PinEntryScreen
-        onSuccess={() => {
-          setShowPinEntry(false);
-          // PIN was successfully verified, mark as checked for this session
-          pinCheckedRef.current = true;
-        }}
-      />
-    );
-  }
-
-  // Show PIN setup screen for first-time users
-  if (showPinSetup) {
-    return (
-      <PinSetupScreen
-        onComplete={() => {
-          setShowPinSetup(false);
-        }}
-      />
-    );
-  }
-
-  return <HomeScreen />;
+  return <MainNavigator />;
 }
 
 export default function App() {

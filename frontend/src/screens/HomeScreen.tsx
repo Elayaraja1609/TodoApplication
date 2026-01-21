@@ -7,24 +7,31 @@ import {
   StyleSheet,
   ScrollView,
   Animated,
-  Modal,
   Dimensions,
   Alert,
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { apiService } from '../services/api';
 import { StorageService } from '../services/storage';
 import { Todo } from '../types';
 import { TodoCard } from '../components/TodoCard';
 import { format, isToday, isTomorrow, isThisWeek, isThisMonth } from 'date-fns';
 import { DrawerContent } from '../components/DrawerContent';
-import { TaskDetailScreen } from './TaskDetailScreen';
 import { CategoriesScreen } from './CategoriesScreen';
 import { CalendarViewScreen } from './CalendarViewScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { createSampleData } from '../utils/sampleData';
 import { useAuth } from '../contexts/AuthContext';
+
+type RootStackParamList = {
+  Home: undefined;
+  TaskDetail: { todoId?: number; isCompleted?: boolean };
+};
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 const DRAWER_WIDTH = width * 0.75;
@@ -38,13 +45,12 @@ interface Section {
 
 export const HomeScreen: React.FC = () => {
   const { user } = useAuth();
+  const navigation = useNavigation<NavigationProp>();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<'categories' | 'calendar' | 'search' | null>('categories');
   const [drawerMenuSelection, setDrawerMenuSelection] = useState<'main' | 'completed'>('main');
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const [taskDetailVisible, setTaskDetailVisible] = useState(false);
-  const [selectedTodoId, setSelectedTodoId] = useState<number | undefined>(undefined);
   const [categoriesVisible, setCategoriesVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,6 +62,19 @@ export const HomeScreen: React.FC = () => {
     loadTodos();
     loadUserPreferences();
   }, []);
+
+  // Reload todos when screen comes into focus (e.g., returning from TaskDetailScreen)
+  // Using navigation listener instead of useFocusEffect for better compatibility
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', async () => {
+      // Set current screen state to 'Home' when HomeScreen is focused
+      await StorageService.setItem('lastActiveScreen', 'Home');
+      // DEBUG: Show alert with current state
+      Alert.alert('Debug: HomeScreen Focus', `State set to: Home\nScreen: HomeScreen`);
+      loadTodos();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const loadUserPreferences = async () => {
     try {
@@ -374,12 +393,10 @@ export const HomeScreen: React.FC = () => {
         <CalendarViewScreen
           todos={todos}
           onTaskSelect={(todoId) => {
-            setSelectedTodoId(todoId);
-            setTaskDetailVisible(true);
+            navigation.navigate('TaskDetail', { todoId, isCompleted: todos.find(t => t.id === todoId)?.isCompleted });
           }}
           onAddTask={() => {
-            setSelectedTodoId(undefined);
-            setTaskDetailVisible(true);
+            navigation.navigate('TaskDetail');
           }}
           onRefresh={loadTodos}
         />
@@ -409,8 +426,7 @@ export const HomeScreen: React.FC = () => {
                         key={todo.id}
                         todo={todo}
                         onPress={() => {
-                          setSelectedTodoId(todo.id);
-                          setTaskDetailVisible(true);
+                          navigation.navigate('TaskDetail', { todoId: todo.id, isCompleted: todo.isCompleted });
                         }}
                         onToggleComplete={() => handleToggleComplete(todo.id)}
                       />
@@ -458,8 +474,7 @@ export const HomeScreen: React.FC = () => {
                       key={todo.id}
                       todo={todo}
                       onPress={() => {
-                        setSelectedTodoId(todo.id);
-                        setTaskDetailVisible(true);
+                        navigation.navigate('TaskDetail', { todoId: todo.id, isCompleted: todo.isCompleted });
                       }}
                       onToggleComplete={() => handleToggleComplete(todo.id)}
                     />
@@ -489,8 +504,7 @@ export const HomeScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.fab}
             onPress={() => {
-              setSelectedTodoId(undefined);
-              setTaskDetailVisible(true);
+              navigation.navigate('TaskDetail');
             }}
           >
             <Ionicons name="add" size={32} color="#fff" />
@@ -498,40 +512,6 @@ export const HomeScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Task Detail Screen Modal */}
-      <Modal
-        visible={taskDetailVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => {
-          setTaskDetailVisible(false);
-          setSelectedTodoId(undefined);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => {
-              setTaskDetailVisible(false);
-              setSelectedTodoId(undefined);
-            }}
-          />
-          <View style={styles.modalContainer}>
-            <TaskDetailScreen
-              todoId={selectedTodoId}
-              onClose={() => {
-                setTaskDetailVisible(false);
-                setSelectedTodoId(undefined);
-              }}
-              onSave={() => {
-                loadTodos();
-              }}
-              isCompleted={selectedTodoId ? todos.find(t => t.id === selectedTodoId)?.isCompleted : false}
-            />
-          </View>
-        </View>
-      </Modal>
 
               {/* Categories Screen */}
               <CategoriesScreen
@@ -732,26 +712,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ec4899',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContainer: {
-    height: '93%',
-    width: '100%',
-    backgroundColor: '#1e1b4b',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    overflow: 'hidden',
   },
   fullScreenModal: {
     position: 'absolute',

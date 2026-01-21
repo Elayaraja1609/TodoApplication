@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
+import { StorageService } from '@/services/storage';
 
 interface DrawerContentProps {
   navigation?: any;
@@ -21,6 +22,7 @@ export const DrawerContent: React.FC<DrawerContentProps> = ({ onClose, onMenuSel
   const handleLogout = async () => {
     try {
       await logout();
+      await StorageService.clearPinUnlocked();
       onClose?.();
     } catch (error) {
       console.error('Logout failed:', error);
