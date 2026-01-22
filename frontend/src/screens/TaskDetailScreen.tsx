@@ -993,7 +993,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
         </View>
 
         {/* Audio Recording */}
-        <View style={styles.attachmentSection}>
+        <View style={styles.audioAttachmentSection}>
           {/* Existing Audio Files */}
           {audioUris.map((audioUri, index) => (
             <View key={index} style={styles.audioItem}>
@@ -1041,7 +1041,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
         </View>
 
         {/* Image Attachments */}
-        <View style={styles.attachmentSection}>
+        <View style={styles.imageAttachmentSection}>
           {/* Existing Images */}
           {imageUris.map((imageUri, index) => (
             <View key={index} style={styles.imageContainer}>
@@ -1307,7 +1307,10 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     fontSize: 16,
   },
-  attachmentSection: {
+  audioAttachmentSection: {
+    marginBottom: 8,
+  },
+  imageAttachmentSection: {
     marginBottom: 8,
     display: 'none',
   },
