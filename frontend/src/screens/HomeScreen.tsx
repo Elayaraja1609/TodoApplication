@@ -288,7 +288,7 @@ export const HomeScreen: React.FC = () => {
           <Ionicons name="menu" size={24} color="#fff" />
         </TouchableOpacity>
         <View style={styles.welcomeContainer}>
-          <Text style={styles.welcomeText}>
+          <Text style={styles.welcomeText} testID="home-welcome-text">
             Welcome {user?.firstName || ''} {user?.lastName || ''}
           </Text>
         </View>
@@ -503,6 +503,7 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.bottomBar}>
           <TouchableOpacity
             style={styles.fab}
+            testID="home-add-task-button"
             onPress={() => {
               navigation.navigate('TaskDetail');
             }}

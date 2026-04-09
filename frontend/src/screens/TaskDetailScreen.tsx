@@ -766,6 +766,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
         <View style={styles.section}>
           <TextInput
             style={[styles.titleInput, isCompleted && styles.titleInputDisabled]}
+            testID="task-title-input"
             placeholder="Task name"
             placeholderTextColor="#9ca3af"
             value={title}
@@ -982,6 +983,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
           </View>
           <TextInput
             style={[styles.noteInput, isCompleted && styles.noteInputDisabled]}
+            testID="task-note-input"
             placeholder="Enter note..."
             placeholderTextColor="#9ca3af"
             value={description}
@@ -1090,6 +1092,7 @@ export const TaskDetailScreen: React.FC<TaskDetailScreenProps> = ({
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.saveUpdateButton} 
+              testID="task-save-button"
               onPress={handleSave} 
               disabled={loading}
             >

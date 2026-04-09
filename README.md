@@ -185,10 +185,49 @@ cd backend
 dotnet test
 ```
 
+### Backend automation (integration + Selenium smoke)
+```bash
+cd backend/tests
+# Optional: copy and adjust env values
+cp .env.test.example .env.test
+
+# Run API integration tests + Selenium smoke tests
+powershell -ExecutionPolicy Bypass -File ./run-backend-tests.ps1
+```
+
 ### Frontend
 ```bash
 cd frontend
 npm test
+```
+
+### Frontend web E2E (TypeScript)
+```bash
+cd frontend
+# Optional: copy and adjust env values
+cp .env.e2e.example .env.e2e
+
+npm install
+npm run e2e:web
+```
+
+### Frontend mobile E2E (TypeScript + Detox)
+```bash
+cd frontend
+npm install
+
+# Android emulator
+npm run e2e:mobile:build:android
+npm run e2e:mobile:test:android
+
+# iOS simulator
+npm run e2e:mobile:build:ios
+npm run e2e:mobile:test:ios
+```
+
+### Run automation from repository root
+```bash
+powershell -ExecutionPolicy Bypass -File ./run-automation-tests.ps1
 ```
 
 ## 📦 Production Deployment

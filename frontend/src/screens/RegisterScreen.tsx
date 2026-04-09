@@ -127,6 +127,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
           <View style={styles.form}>
           <TextInput
             style={styles.input}
+            testID="register-first-name-input"
             placeholder="First Name"
             placeholderTextColor="#9ca3af"
             value={firstName}
@@ -136,6 +137,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
 
           <TextInput
             style={styles.input}
+            testID="register-last-name-input"
             placeholder="Last Name"
             placeholderTextColor="#9ca3af"
             value={lastName}
@@ -145,6 +147,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
 
           <TextInput
             style={styles.input}
+            testID="register-email-input"
             placeholder="Email"
             placeholderTextColor="#9ca3af"
             value={email}
@@ -156,6 +159,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
 
           <TextInput
             style={styles.input}
+            testID="register-password-input"
             placeholder="Password"
             placeholderTextColor="#9ca3af"
             value={password}
@@ -166,6 +170,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
 
           <TouchableOpacity
             style={styles.button}
+            testID="register-submit-button"
             onPress={handleRegister}
             disabled={loading || success}
           >
@@ -177,6 +182,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onNavigateToLogi
           </TouchableOpacity>
 
           <TouchableOpacity
+            testID="navigate-login-button"
             onPress={() => onNavigateToLogin?.()}
             style={styles.linkButton}
           >

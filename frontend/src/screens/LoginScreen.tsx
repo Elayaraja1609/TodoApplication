@@ -70,12 +70,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
       style={styles.container}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Log in</Text>
+        <Text style={styles.title} testID="login-screen-title">Log in</Text>
         <Text style={styles.subtitle}>Log in to access your tasks</Text>
 
         <View style={styles.form}>
           <TextInput
             style={styles.input}
+            testID="login-email-input"
             placeholder="Email"
             placeholderTextColor="#9ca3af"
             value={email}
@@ -87,6 +88,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
 
           <TextInput
             style={styles.input}
+            testID="login-password-input"
             placeholder="Password"
             placeholderTextColor="#9ca3af"
             value={password}
@@ -97,6 +99,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
 
           <TouchableOpacity
             style={styles.button}
+            testID="login-submit-button"
             onPress={handleLogin}
             disabled={loading}
           >
@@ -108,6 +111,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
           </TouchableOpacity>
 
           <TouchableOpacity
+            testID="navigate-register-button"
             onPress={() => onNavigateToRegister?.()}
             style={styles.linkButton}
           >
